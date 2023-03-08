@@ -10,34 +10,35 @@ const web3 = new Web3(
 );
 //const { address: admin } = web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY);
 
-var opts = require('optimist').string('tokenA').string('tokenB').argv;
+var opts = require('optimist').string('tokenA').string('tokenB').string('router1').string('router2').argv;
+console.log(opts);
+
+const r1address=opts.router1;
+const r2address=opts.router2;
 const tokenA=opts.tokenA;
 const tokenB=opts.tokenB;
 
 
-const quick = new web3.eth.Contract(
+const router1 = new web3.eth.Contract(
   abis.uniswap.uniswap,
-  addresses.quick.router
+  r1address
 )
 
-const sushi = new web3.eth.Contract(
-  abis.sushi.sushi,
-  addresses.sushi.router
+const router2 = new web3.eth.Contract(
+  abis.uniswap.uniswap,
+  r2address
 )
 
 const ONE_WEI = web3.utils.toBN(web3.utils.toWei('1'));
 const AMOUNT_IN_WEI = web3.utils.toBN(web3.utils.toWei('1'));
-/*const DIRECTION = {
-  SUSHI_TO_UNISWAP: 0,
-  QUICK_TO_SUSHI: 1
-};*/
+
 
 const init = async () => {
   const networkId = await web3.eth.net.getId();
 
   /*let ethPrice;
   const updateEthPrice = async () => {
-    const results = await quick.methods.getAmountsOut(web3.utils.toWei('1'), [addresses.tokens.weth, addresses.tokens.link]).call();   //dai to wbnb pancakeswap
+    const results = await router1.methods.getAmountsOut(web3.utils.toWei('1'), [addresses.tokens.weth, addresses.tokens.link]).call();   //dai to wbnb pancakeswap
     ethPrice = web3.utils.toBN('1').mul(web3.utils.toBN(results[1])).div(ONE_WEI);
   }
   await updateEthPrice();
@@ -49,21 +50,20 @@ const init = async () => {
 
       try {
 
-        const amountsOut1 = await sushi.methods.getAmountsOut(AMOUNT_IN_WEI, [tokenA, tokenB]).call();   //dai to wbnb pancakeswap
-        const amountsOut2 = await quick.methods.getAmountsOut(amountsOut1[1], [tokenB, tokenA]).call();    //wbnb to dai bakeryswap
-        const amountsOut3 = await quick.methods.getAmountsOut(AMOUNT_IN_WEI, [tokenA, tokenB]).call();    // dai to Wbnb baketswap
-        const amountsOut4 = await sushi.methods.getAmountsOut(amountsOut3[1], [tokenB, tokenA]).call();   // Wbnb to dai pancakeswap
+        const amountsOut1 = await router1.methods.getAmountsOut(AMOUNT_IN_WEI, [tokenA, tokenB]).call();   
+        const amountsOut2 = await router2.methods.getAmountsOut(amountsOut1[1], [tokenB, tokenA]).call();  
+        
+        const amountsOut3 = await router2.methods.getAmountsOut(AMOUNT_IN_WEI, [tokenA, tokenB]).call();  
+        const amountsOut4 = await router1.methods.getAmountsOut(amountsOut3[1], [tokenB, tokenA]).call(); 
+
+        console.log(`router1 -> router2. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut2[1].toString())}`);
+        console.log(`router2 -> router1. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut4[1].toString())}`);
+
+        const resultFromRouter2 = web3.utils.toBN(amountsOut2[1])
+        const resultFromRouter1 = web3.utils.toBN(amountsOut4[1])
 
 
-
-        console.log(`Sushi -> Quick. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut2[1].toString())}`);
-        console.log(`Quick -> Sushi. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut4[1].toString())}`);
-
-        const resultFromQuick = web3.utils.toBN(amountsOut2[1])
-        const resultFromSushi = web3.utils.toBN(amountsOut2[1])
-
-
-        if (resultFromQuick.gt(AMOUNT_IN_WEI)) {
+        if (resultFromRouter2.gt(AMOUNT_IN_WEI)) {
           /*const tx = flashloan.methods.initiateFlashloan(
             addresses.dydx.solo, 
             addresses.tokens.dai, 
@@ -76,7 +76,7 @@ const init = async () => {
           ]);
 
           const txCost = web3.utils.toBN(gasCost).mul(web3.utils.toBN(gasPrice)).mul(ethPrice);
-          const profit = resultFromQuick.sub(AMOUNT_IN_WEI).sub(txCost);
+          const profit = resultFromRouter2.sub(AMOUNT_IN_WEI).sub(txCost);
 
           console.log(profit);
 
@@ -96,7 +96,7 @@ const init = async () => {
           }
         }
 
-        if (resultFromSushi.gt(AMOUNT_IN_WEI)) {
+        if (resultFromRouter1.gt(AMOUNT_IN_WEI)) {
           /*const tx = flashloan.methods.initiateFlashloan(
             addresses.dydx.solo, 
             addresses.tokens.dai, 
@@ -108,7 +108,7 @@ const init = async () => {
             tx.estimateGas({ from: admin }),
           ]);
           const txCost = web3.utils.toBN(gasCost).mul(web3.utils.toBN(gasPrice)).mul(ethPrice);
-          const profit = resultFromSushi.sub(AMOUNT_IN_WEI).sub(txCost);
+          const profit = resultFromRouter1.sub(AMOUNT_IN_WEI).sub(txCost);
 
           console.log(profit);
           if (profit > 0) {
