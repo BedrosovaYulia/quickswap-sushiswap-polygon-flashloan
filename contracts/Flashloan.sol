@@ -4,11 +4,11 @@ pragma experimental ABIEncoderV2;
 import "@studydefi/money-legos/dydx/contracts/DydxFlashloanBase.sol";
 import "@studydefi/money-legos/dydx/contracts/ICallee.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import './IUniswapV2Router02.sol';
+import './IQuickswapV2Router02.sol';
 import './IWeth.sol';
 
 contract Flashloan is ICallee, DydxFlashloanBase {
-    enum Direction { SushiToUniswap, UniswapToSushi} 
+    enum Direction { SushiToQuickswap, QuickswapToSushi} 
     struct ArbInfo {
         Direction direction;
         uint repayAmount;
@@ -20,24 +20,24 @@ contract Flashloan is ICallee, DydxFlashloanBase {
       uint date
     );
 
-    IUniswapV2Router02 sushi;
-    IUniswapV2Router02 uniswap;
+    IQuickswapV2Router02 sushi;
+    IQuickswapV2Router02 quickswap;
     IWeth weth;
-    IERC20 dai;
+    IERC20 targetToken;
     address beneficiary;
     
 
     constructor(
         address sushiAddress,
-        address uniswapAddress,
+        address quickswapAddress,
         address wethAddress,
-        address daiAddress,
+        address targetTokenAddress,
         address beneficiaryAddress
     ) public {
-      sushi = IUniswapV2Router02(sushiAddress);
-      uniswap = IUniswapV2Router02(uniswapAddress);
+      sushi = IQuickswapV2Router02(sushiAddress);
+      quickswap = IQuickswapV2Router02(quickswapAddress);
       weth = IWeth(wethAddress);
-      dai = IERC20(daiAddress);
+      targetToken = IERC20(targetTokenAddress);
       beneficiary = beneficiaryAddress;
     }
 
@@ -49,43 +49,43 @@ contract Flashloan is ICallee, DydxFlashloanBase {
         bytes memory data
     ) public {
         ArbInfo memory arbInfo = abi.decode(data, (ArbInfo));
-        uint256 balanceDai = dai.balanceOf(address(this));
+        uint256 balanceTargetToken = targetToken.balanceOf(address(this));
 
-        if(arbInfo.direction == Direction.SushiToUniswap) {
+        if(arbInfo.direction == Direction.SushiToQuickswap) {
           //Buy ETH on Sushi
-          dai.approve(address(sushi), balanceDai); 
+          targetToken.approve(address(sushi), balanceTargetToken); 
           address[] memory path = new address[](2);
-          path[0] = address(dai);
+          path[0] = address(targetToken);
           path[1] = address(weth);
-          uint[] memory minOuts = sushi.getAmountsOut(balanceDai, path); 
+          uint[] memory minOuts = sushi.getAmountsOut(balanceTargetToken, path); 
           sushi.swapExactTokensForETH(
-            balanceDai,
+            balanceTargetToken,
             minOuts[1], 
             path, 
             address(this), 
             now
           );
 
-          //Sell ETH on Uniswap
+          //Sell ETH on Quickswap
           address[] memory path2 = new address[](2);
           path2[0] = address(weth);
-          path2[1] = address(dai);
-          uint[] memory minOuts2 = uniswap.getAmountsOut(address(this).balance, path2); 
-          uniswap.swapExactETHForTokens.value(address(this).balance)(
+          path2[1] = address(targetToken);
+          uint[] memory minOuts2 = quickswap.getAmountsOut(address(this).balance, path2); 
+          quickswap.swapExactETHForTokens.value(address(this).balance)(
             minOuts2[1], 
             path2, 
             address(this), 
             now
           );
         } else {
-          //Buy ETH on Uniswap
-          dai.approve(address(uniswap), balanceDai); 
+          //Buy ETH on Quickswap
+          targetToken.approve(address(quickswap), balanceTargetToken); 
           address[] memory path = new address[](2);
-          path[0] = address(dai);
+          path[0] = address(targetToken);
           path[1] = address(weth);
-          uint[] memory minOuts = uniswap.getAmountsOut(balanceDai, path); 
-          uniswap.swapExactTokensForETH(
-            balanceDai, 
+          uint[] memory minOuts = quickswap.getAmountsOut(balanceTargetToken, path); 
+          quickswap.swapExactTokensForETH(
+            balanceTargetToken, 
             minOuts[1], 
             path, 
             address(this), 
@@ -95,7 +95,7 @@ contract Flashloan is ICallee, DydxFlashloanBase {
           //Sell ETH on Sushi
           address[] memory path2 = new address[](2);
           path2[0] = address(weth);
-          path2[1] = address(dai);
+          path2[1] = address(targetToken);
           uint[] memory minOuts2 = sushi.getAmountsOut(address(this).balance, path2); 
           sushi.swapExactETHForTokens.value(address(this).balance)( 
             minOuts2[1], 
@@ -105,12 +105,12 @@ contract Flashloan is ICallee, DydxFlashloanBase {
           );
         }
         require(
-            dai.balanceOf(address(this)) >= arbInfo.repayAmount,
+            targetToken.balanceOf(address(this)) >= arbInfo.repayAmount,
             "Not enough funds to repay dydx loan!"
         );
 
-        uint profit = dai.balanceOf(address(this)) - arbInfo.repayAmount; 
-        dai.transfer(beneficiary, profit);
+        uint profit = targetToken.balanceOf(address(this)) - arbInfo.repayAmount; 
+        targetToken.transfer(beneficiary, profit);
         emit NewArbitrage(arbInfo.direction, profit, now);
     }
 
