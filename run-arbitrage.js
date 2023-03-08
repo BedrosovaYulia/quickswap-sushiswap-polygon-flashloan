@@ -10,9 +10,6 @@ const web3 = new Web3(
 );
 //const { address: admin } = web3.eth.accounts.wallet.add(process.env.PRIVATE_KEY);
 
-//TODO: сделать чтобы 2 токена и 2 роутера подавались из командной строки
-//сделать чтобы оно не валилось на 1й же ошибке
-
 var opts = require('optimist').string('tokenA').string('tokenB').argv;
 const tokenA=opts.tokenA;
 const tokenB=opts.tokenB;
@@ -62,11 +59,11 @@ const init = async () => {
         console.log(`Sushi -> Quick. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut2[1].toString())}`);
         console.log(`Quick -> Sushi. input / output: ${web3.utils.fromWei(AMOUNT_IN_WEI.toString())} / ${web3.utils.fromWei(amountsOut4[1].toString())}`);
 
-        const daiFromQuick = web3.utils.toBN(amountsOut2[1])
-        const daiFromSushi = web3.utils.toBN(amountsOut2[1])
+        const resultFromQuick = web3.utils.toBN(amountsOut2[1])
+        const resultFromSushi = web3.utils.toBN(amountsOut2[1])
 
 
-        if (daiFromQuick.gt(AMOUNT_IN_WEI)) {
+        if (resultFromQuick.gt(AMOUNT_IN_WEI)) {
           /*const tx = flashloan.methods.initiateFlashloan(
             addresses.dydx.solo, 
             addresses.tokens.dai, 
@@ -79,7 +76,7 @@ const init = async () => {
           ]);
 
           const txCost = web3.utils.toBN(gasCost).mul(web3.utils.toBN(gasPrice)).mul(ethPrice);
-          const profit = daiFromQuick.sub(AMOUNT_IN_WEI).sub(txCost);
+          const profit = resultFromQuick.sub(AMOUNT_IN_WEI).sub(txCost);
 
           console.log(profit);
 
@@ -99,7 +96,7 @@ const init = async () => {
           }
         }
 
-        if (daiFromSushi.gt(AMOUNT_IN_WEI)) {
+        if (resultFromSushi.gt(AMOUNT_IN_WEI)) {
           /*const tx = flashloan.methods.initiateFlashloan(
             addresses.dydx.solo, 
             addresses.tokens.dai, 
@@ -111,7 +108,7 @@ const init = async () => {
             tx.estimateGas({ from: admin }),
           ]);
           const txCost = web3.utils.toBN(gasCost).mul(web3.utils.toBN(gasPrice)).mul(ethPrice);
-          const profit = daiFromKyber.sub(AMOUNT_IN_WEI).sub(txCost);
+          const profit = resultFromSushi.sub(AMOUNT_IN_WEI).sub(txCost);
 
           console.log(profit);
           if (profit > 0) {
